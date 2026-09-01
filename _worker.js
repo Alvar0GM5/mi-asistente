@@ -66,7 +66,7 @@ export default {
             return new Response("Error: No se han encontrado variables de entorno GROQ_API_KEY ni GEMINI_API_KEY en Cloudflare.", { status: 500, headers: corsHeaders });
           }
 
-          // 1. Si es solo texto, probamos con GROQ
+          // 1. Si es solo texto, enviamos a GROQ usando el modelo compatible Llama 3
           if (!hasFiles && groqKey) {
             const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
               method: "POST",
@@ -75,7 +75,7 @@ export default {
                 "Content-Type": "application/json"
               },
               body: JSON.stringify({
-                model: "llama-3.1-8b-instant",
+                model: "llama3-8b-8192",
                 messages: [{ role: "user", content: body.message || "Hola" }]
               })
             });
