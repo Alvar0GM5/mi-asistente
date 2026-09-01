@@ -15,7 +15,7 @@ export default {
     const apiKey = env.GEMINI_API_KEY;
     const groqKey = env.GROQ_API_KEY;
 
-    // Endpoint 1: Subida de archivos (PDFs, Imágenes, Vídeos, Docs) a Gemini
+    // Endpoint 1: Subida de archivos
     if (url.pathname === "/api/upload") {
       if (request.method === "POST") {
         try {
@@ -55,14 +55,25 @@ export default {
       }
     }
 
-    // Endpoint 2: Chat con enrutamiento inteligente
+    // Endpoint 2: Chat con Diagnóstico
     if (url.pathname === "/api/chat") {
       if (request.method === "POST") {
         try {
           const body = await request.json();
           const hasFiles = body.fileUris && Array.isArray(body.fileUris) && body.fileUris.length > 0;
 
-          // CASO 1: SOLO TEXTO -> Usamos GROQ (Rápido y Cuota ilimitada)
+          let groqErrorLog = "";
+          let geminiErrorLog = "";
+
+          // Comprobar presencia de claves
+          if (!groqKey && !hasFiles) {
+            groqErrorLog = "La variable GROQ_API_KEY no existe en env. ";
+          }
+          if (!apiKey && hasFiles) {
+            geminiErrorLog = "La variable GEMINI_API_KEY no existe en env. ";
+          }
+
+          // 1. Probar Groq si es texto
           if (!hasFiles && groqKey) {
             const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
               method: "POST",
@@ -91,10 +102,13 @@ export default {
                   ...corsHeaders
                 }
               });
+            } else {
+              const errBody = await groqRes.text();
+              groqErrorLog = `Groq devolvió estado ${groqRes.status}: ${errBody}`;
             }
           }
 
-          // CASO 2: TIENE ARCHIVOS (o Groq no estaba disponible) -> Usamos GEMINI
+          // 2. Probar Gemini
           if (apiKey) {
             const parts = [];
             if (body.message) parts.push({ text: body.message });
@@ -130,18 +144,18 @@ export default {
                   ...corsHeaders
                 }
               });
-            } else if (hasFiles && geminiResponse.status === 429) {
-              return new Response("La cuota de Gemini para procesar archivos/imágenes se ha agotado por hoy.", {
-                status: 429,
-                headers: corsHeaders
-              });
+            } else {
+              const errBody = await geminiResponse.text();
+              geminiErrorLog = `Gemini devolvió estado ${geminiResponse.status}: ${errBody}`;
             }
           }
 
-          return new Response("Error al conectar con los servicios de IA.", { status: 500, headers: corsHeaders });
+          // Devolver el diagnóstico exacto en pantalla
+          const fullDiagnostics = `Detalles del error:\n- Groq: ${groqErrorLog || "No ejecutado"}\n- Gemini: ${geminiErrorLog || "No ejecutado"}`;
+          return new Response(fullDiagnostics, { status: 500, headers: corsHeaders });
 
         } catch (err) {
-          return new Response(`Error en el servidor: ${err.message}`, { status: 500, headers: corsHeaders });
+          return new Response(`Error interno del servidor: ${err.message}`, { status: 500, headers: corsHeaders });
         }
       }
     }
