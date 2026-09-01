@@ -12,7 +12,10 @@ export default {
         if (hasFiles) {
           const geminiApiKey = env.GEMINI_API_KEY;
           if (!geminiApiKey) {
-            return new Response(JSON.stringify({ error: "Falta la variable GEMINI_API_KEY en Cloudflare" }), { status: 500 });
+            return new Response(JSON.stringify({ error: "Falta la variable GEMINI_API_KEY en Cloudflare" }), { 
+              status: 400, 
+              headers: { "Content-Type": "application/json" } 
+            });
           }
 
           const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiApiKey}`;
@@ -35,7 +38,10 @@ export default {
 
           const data = await response.json();
           if (!response.ok) {
-            throw new Error(data.error?.message || "Error en la API de Gemini");
+            return new Response(JSON.stringify({ error: data.error?.message || "Error en la API de Gemini" }), { 
+              status: 400, 
+              headers: { "Content-Type": "application/json" } 
+            });
           }
 
           const replyText = data.candidates?.[0]?.content?.parts?.[0]?.text || "Sin respuesta de Gemini.";
@@ -46,10 +52,12 @@ export default {
 
         // --- CASO B: SOLO TEXTO -> GROK (xAI) ---
         else {
-          // Busca la clave de Grok/xAI en tus variables de entorno
           const grokApiKey = env.GROK_API_KEY || env.XAI_API_KEY;
           if (!grokApiKey) {
-            return new Response(JSON.stringify({ error: "Falta la variable GROK_API_KEY (o XAI_API_KEY) en Cloudflare" }), { status: 500 });
+            return new Response(JSON.stringify({ error: "Falta la variable GROK_API_KEY (o XAI_API_KEY) en Cloudflare" }), { 
+              status: 400, 
+              headers: { "Content-Type": "application/json" } 
+            });
           }
 
           const grokUrl = "https://api.x.ai/v1/chat/completions";
@@ -61,7 +69,7 @@ export default {
               "Authorization": `Bearer ${grokApiKey}`
             },
             body: JSON.stringify({
-              model: "grok-beta",
+              model: "grok-2-latest",
               messages: [
                 { role: "user", content: body.message || "Hola" }
               ]
@@ -70,7 +78,10 @@ export default {
 
           const data = await response.json();
           if (!response.ok) {
-            throw new Error(data.error?.message || "Error en la API de Grok");
+            return new Response(JSON.stringify({ error: data.error?.message || "Error en la API de Grok" }), { 
+              status: 400, 
+              headers: { "Content-Type": "application/json" } 
+            });
           }
 
           const replyText = data.choices?.[0]?.message?.content || "Sin respuesta de Grok.";
@@ -95,7 +106,10 @@ export default {
         const file = formData.get("file");
 
         if (!file) {
-          return new Response(JSON.stringify({ error: "No se envió ningún archivo" }), { status: 400 });
+          return new Response(JSON.stringify({ error: "No se envió ningún archivo" }), { 
+            status: 400, 
+            headers: { "Content-Type": "application/json" } 
+          });
         }
 
         const uploadReq = await fetch(`https://generativelanguage.googleapis.com/upload/v1beta/files?key=${apiKey}`, {
@@ -128,10 +142,14 @@ export default {
         });
 
       } catch (err) {
-        return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+        return new Response(JSON.stringify({ error: err.message }), { 
+          status: 500, 
+          headers: { "Content-Type": "application/json" } 
+        });
       }
     }
 
-    return env.ASSETS.fetch(request);
+    // Para cualquier otra ruta que no sea de la API:
+    return new Response("Not Found", { status: 404 });
   }
 };
