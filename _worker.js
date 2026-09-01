@@ -1,22 +1,16 @@
-export default {
+  export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    // Endpoint para enviar mensajes
     if (url.pathname === "/api/chat" && request.method === "POST") {
       try {
         const body = await request.json();
         const apiKey = env.GEMINI_API_KEY;
 
-        if (!apiKey) {
-          return new Response("Falta la variable GEMINI_API_KEY en Cloudflare", { status: 500 });
-        }
-
         const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?alt=sse&key=${apiKey}`;
 
-        let parts = [{ text: body.message || "Hola" }];
+        let parts = [{ text: body.message || "" }];
 
-        // Si vienen archivos adjuntos
         if (body.fileUris && body.fileUris.length > 0) {
           body.fileUris.forEach(file => {
             parts.push({
@@ -28,19 +22,12 @@ export default {
           });
         }
 
-        const payload = {
-          contents: [
-            {
-              role: "user",
-              parts: parts
-            }
-          ]
-        };
-
         const response = await fetch(geminiUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: parts }]
+          })
         });
 
         return new Response(response.body, {
@@ -52,20 +39,15 @@ export default {
         });
 
       } catch (err) {
-        return new Response("Error en el worker: " + err.message, { status: 500 });
+        return new Response(err.message, { status: 500 });
       }
     }
 
-    // Endpoint para subir archivos
     if (url.pathname === "/api/upload" && request.method === "POST") {
       try {
         const apiKey = env.GEMINI_API_KEY;
         const formData = await request.formData();
         const file = formData.get("file");
-
-        if (!file) {
-          return new Response(JSON.stringify({ error: "No se envió ningún archivo" }), { status: 400 });
-        }
 
         const uploadReq = await fetch(`https://generativelanguage.googleapis.com/upload/v1beta/files?key=${apiKey}`, {
           method: "POST",
@@ -101,7 +83,6 @@ export default {
       }
     }
 
-    // Servir la web estática si no es una ruta API
     return env.ASSETS.fetch(request);
   }
 };
