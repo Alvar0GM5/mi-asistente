@@ -3,119 +3,154 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mi Asistente</title>
-
+    <title>Mi Asistente de IA</title>
     <style>
         body {
-            margin: 0;
             font-family: Arial, sans-serif;
-            background: #111;
-            color: white;
+            background-color: #f4f4f9;
+            margin: 0;
             display: flex;
             justify-content: center;
             align-items: center;
-            min-height: 100vh;
+            height: 100vh;
         }
-
-        .contenedor {
-            width: 90%;
-            max-width: 800px;
-            text-align: center;
-        }
-
-        h1 {
-            font-size: 42px;
-            margin-bottom: 10px;
-        }
-
-        p {
-            color: #aaa;
-            margin-bottom: 30px;
-        }
-
-        .chat {
-            background: #1c1c1c;
-            border-radius: 15px;
-            padding: 20px;
-            min-height: 300px;
-            text-align: left;
-        }
-
-        .entrada {
+        .chat-container {
+            width: 100%;
+            max-width: 400px;
+            height: 80vh;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
             display: flex;
-            gap: 10px;
-            margin-top: 15px;
+            flex-direction: column;
+            overflow: hidden;
         }
-
-        input {
+        .chat-header {
+            background: #4f46e5;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .chat-messages {
             flex: 1;
             padding: 15px;
-            border-radius: 10px;
-            border: none;
-            background: #292929;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .message {
+            padding: 10px 15px;
+            border-radius: 8px;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+        .user-message {
+            background: #4f46e5;
             color: white;
-            font-size: 16px;
+            align-self: flex-end;
         }
-
-        button {
-            padding: 15px 25px;
+        .ai-message {
+            background: #e5e7eb;
+            color: #1f2937;
+            align-self: flex-start;
+        }
+        .chat-input-area {
+            display: flex;
+            border-top: 1px solid #e5e7eb;
+            padding: 10px;
+            background: white;
+        }
+        .chat-input-area input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            outline: none;
+        }
+        .chat-input-area button {
+            background: #4f46e5;
+            color: white;
             border: none;
-            border-radius: 10px;
+            padding: 10px 15px;
+            margin-left: 8px;
+            border-radius: 6px;
             cursor: pointer;
-            font-size: 16px;
         }
-
-        button:hover {
-            opacity: 0.8;
+        .chat-input-area button:hover {
+            background: #4338ca;
         }
     </style>
 </head>
-
 <body>
 
-    <div class="contenedor">
-
-        <h1>Mi Asistente</h1>
-
-        <p>Tu asistente personal</p>
-
-        <div class="chat">
-            <div id="mensajes">
-                <p>El sistema está preparado.</p>
-            </div>
-
-            <div class="entrada">
-                <input
-                    type="text"
-                    id="mensaje"
-                    placeholder="Escribe algo..."
-                >
-
-                <button onclick="enviarMensaje()">
-                    Enviar
-                </button>
-            </div>
+    <div class="chat-container">
+        <div class="chat-header">Asistente Gemini</div>
+        <div class="chat-messages" id="chatMessages">
+            <div class="message ai-message">¡Hola! ¿En qué puedo ayudarte hoy?</div>
         </div>
-
+        <div class="chat-input-area">
+            <input type="text" id="userInput" placeholder="Escribe tu mensaje..." onkeypress="handleKeyPress(event)">
+            <button onclick="sendMessage()">Enviar</button>
+        </div>
     </div>
 
     <script>
-        function enviarMensaje() {
-            const entrada = document.getElementById("mensaje");
-            const mensajes = document.getElementById("mensajes");
+        // PEGA AQUÍ TU URL DE CLOUDFLARE WORKER ENTRE LAS COMILLAS
+        const WORKER_URL = "https://dulce-sueño-7013.alvarogomez66481.workers.dev";
 
-            if (entrada.value.trim() === "") {
-                return;
+        async function sendMessage() {
+            const inputField = document.getElementById("userInput");
+            const messageText = inputField.value.trim();
+            if (!messageText) return;
+
+            const chatMessages = document.getElementById("chatMessages");
+
+            // Mostrar mensaje del usuario
+            const userDiv = document.createElement("div");
+            userDiv.className = "message user-message";
+            userDiv.textContent = messageText;
+            chatMessages.appendChild(userDiv);
+
+            inputField.value = "";
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            // Mostrar estado de carga temporal
+            const loadingDiv = document.createElement("div");
+            loadingDiv.className = "message ai-message";
+            loadingDiv.textContent = "Pensando...";
+            chatMessages.appendChild(loadingDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            try {
+                // Petición a tu Cloudflare Worker
+                const response = await fetch(WORKER_URL, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ message: messageText })
+                });
+
+                const data = await response.json();
+                
+                // Reemplazar "Pensando..." por la respuesta real de Gemini
+                if (data.reply) {
+                    loadingDiv.textContent = data.reply;
+                } else {
+                    loadingDiv.textContent = "Hubo un error al procesar la respuesta.";
+                }
+            } catch (error) {
+                loadingDiv.textContent = "Error de conexión con el servidor.";
             }
 
-            const nuevoMensaje = document.createElement("p");
-            nuevoMensaje.textContent = "Tú: " + entrada.value;
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
 
-            mensajes.appendChild(nuevoMensaje);
-
-            entrada.value = "";
+        function handleKeyPress(event) {
+            if (event.key === "Enter") {
+                sendMessage();
+            }
         }
     </script>
-
 </body>
 </html>
