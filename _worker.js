@@ -22,17 +22,34 @@ export default {
             return new Response("Error: GEMINI_API_KEY no configurada.", { status: 400, headers: corsHeaders });
           }
 
-          // Petición a la API de Gemini en modo streaming
+          // Construcción de la lista de partes (texto + archivos adjuntos)
+          const parts = [];
+
+          if (body.message) {
+            parts.push({ text: body.message });
+          }
+
+          // Procesar archivos adjuntos codificados en Base64 (imágenes, documentos, audios, vídeos pequeños)
+          if (body.files && Array.isArray(body.files)) {
+            for (const file of body.files) {
+              parts.push({
+                inlineData: {
+                  mimeType: file.mimeType,
+                  data: file.base64Data
+                }
+              });
+            }
+          }
+
           const geminiResponse = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:streamGenerateContent?alt=sse&key=${apiKey}`,
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ contents: [{ parts: [{ text: body.message }] }] })
+              body: JSON.stringify({ contents: [{ parts: parts }] })
             }
           );
 
-          // Transmitir la respuesta directamente al navegador mediante Server-Sent Events
           const { readable, writable } = new TransformStream();
           geminiResponse.body.pipeTo(writable);
 
