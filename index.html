@@ -33,7 +33,6 @@
             backdrop-filter: blur(8px);
         }
 
-        /* Panel Lateral (Sidebar) */
         .sidebar {
             width: 260px;
             background: rgba(18, 20, 26, 0.95);
@@ -105,7 +104,6 @@
 
         .delete-chat:hover { opacity: 1; }
 
-        /* Área Principal de Chat */
         .chat-container {
             flex: 1;
             display: flex;
@@ -168,7 +166,6 @@
             border: 1px solid rgba(255, 255, 255, 0.08);
         }
 
-        /* Área del Input y Archivos Adjuntos */
         .chat-input-container {
             padding: 16px;
             background: rgba(22, 25, 34, 0.95);
@@ -267,9 +264,9 @@
             <div class="chat-input-container">
                 <div class="file-preview" id="filePreview"></div>
                 <div class="chat-input-area">
-                    <button class="attach-btn" onclick="document.getElementById('fileInput').click()" title="Adjuntar foto, vídeo, audio o PDF">📎</button>
+                    <button class="attach-btn" onclick="openFileSelector()" title="Adjuntar archivo">📎</button>
                     <input type="file" id="fileInput" multiple style="display: none;" onchange="handleFileSelect(event)">
-                    <input type="text" id="userInput" placeholder="Escribe un mensaje o adjunta un archivo..." onkeypress="handleKeyPress(event)">
+                    <input type="text" id="userInput" placeholder="Escribe un mensaje..." onkeypress="handleKeyPress(event)">
                     <button class="send-btn" id="sendBtn" onclick="toggleSendOrStop()">Enviar</button>
                 </div>
             </div>
@@ -277,23 +274,22 @@
     </div>
 
     <script>
-        let chats = JSON.parse(localStorage.getItem("ai_chats")) || {};
-        let currentChatId = localStorage.getItem("current_chat_id") || null;
+        let chats = {};
+        let currentChatId = null;
         let currentAbortController = null;
         let selectedFiles = [];
+
+        try {
+            chats = JSON.parse(localStorage.getItem("ai_chats")) || {};
+            currentChatId = localStorage.getItem("current_chat_id") || null;
+        } catch (e) {
+            chats = {};
+            currentChatId = null;
+        }
 
         function saveState() {
             localStorage.setItem("ai_chats", JSON.stringify(chats));
             localStorage.setItem("current_chat_id", currentChatId);
-        }
-
-        function init() {
-            if (!currentChatId || !chats[currentChatId]) {
-                createNewChat();
-            } else {
-                renderSidebar();
-                renderMessages();
-            }
         }
 
         function createNewChat() {
@@ -332,23 +328,23 @@
 
         function renderSidebar() {
             const chatList = document.getElementById("chatList");
+            if (!chatList) return;
             chatList.innerHTML = "";
 
             Object.keys(chats).reverse().forEach(id => {
                 const item = document.createElement("div");
-                item.className = `chat-item ${id === currentChatId ? 'active' : ''}`;
-                item.onclick = () => switchChat(id);
+                item.className = "chat-item " + (id === currentChatId ? 'active' : '');
+                item.onclick = function() { switchChat(id); };
 
-                item.innerHTML = `
-                    <span class="chat-title">${chats[id].title}</span>
-                    <span class="delete-chat" onclick="deleteChat('${id}', event)">&times;</span>
-                `;
+                item.innerHTML = '<span class="chat-title">' + (chats[id].title || 'Conversación') + '</span>' +
+                                 '<span class="delete-chat" onclick="deleteChat(\'' + id + '\', event)">&times;</span>';
                 chatList.appendChild(item);
             });
         }
 
         function renderMessages() {
             const chatMessages = document.getElementById("chatMessages");
+            if (!chatMessages) return;
             chatMessages.innerHTML = "";
 
             const activeChat = chats[currentChatId];
@@ -356,12 +352,20 @@
 
             activeChat.messages.forEach(msg => {
                 const div = document.createElement("div");
-                div.className = `message ${msg.role === 'user' ? 'user-message' : 'ai-message'}`;
-                div.innerHTML = marked.parse(msg.text);
+                div.className = "message " + (msg.role === 'user' ? 'user-message' : 'ai-message');
+                if (window.marked && typeof window.marked.parse === 'function') {
+                    div.innerHTML = window.marked.parse(msg.text || "");
+                } else {
+                    div.textContent = msg.text || "";
+                }
                 chatMessages.appendChild(div);
             });
 
             chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function openFileSelector() {
+            document.getElementById('fileInput').click();
         }
 
         function handleFileSelect(event) {
@@ -377,14 +381,13 @@
 
         function renderFilePreview() {
             const preview = document.getElementById("filePreview");
+            if (!preview) return;
             preview.innerHTML = "";
             selectedFiles.forEach((file, idx) => {
                 const badge = document.createElement("div");
                 badge.className = "file-badge";
-                badge.innerHTML = `
-                    <span>📄 ${file.name}</span>
-                    <span class="remove-file" onclick="removeFile(${idx})">&times;</span>
-                `;
+                badge.innerHTML = '<span>📄 ' + file.name + '</span>' +
+                                 '<span class="remove-file" onclick="removeFile(' + idx + ')">&times;</span>';
                 preview.appendChild(badge);
             });
         }
@@ -401,9 +404,9 @@
             });
 
             if (!initRes.ok) throw new Error("Error al iniciar subida");
-            const { uploadUrl } = await initRes.json();
+            const data = await initRes.json();
 
-            const uploadRes = await fetch(uploadUrl, {
+            const uploadRes = await fetch(data.uploadUrl, {
                 method: "POST",
                 headers: {
                     "X-Goog-Upload-Offset": "0",
@@ -431,4 +434,124 @@
         }
 
         function setSendButtonMode(isGenerating) {
-            
+            const sendBtn = document.getElementById("sendBtn");
+            if (!sendBtn) return;
+            if (isGenerating) {
+                sendBtn.textContent = "Detener";
+                sendBtn.classList.add("stop-mode");
+            } else {
+                sendBtn.textContent = "Enviar";
+                sendBtn.classList.remove("stop-mode");
+            }
+        }
+
+        async function sendMessage() {
+            const inputField = document.getElementById("userInput");
+            const messageText = inputField.value.trim();
+
+            if (!messageText && selectedFiles.length === 0) return;
+
+            const activeChat = chats[currentChatId];
+
+            if (activeChat.messages.length <= 1) {
+                activeChat.title = (messageText || selectedFiles[0]?.name || "Conversación").slice(0, 25) + "...";
+            }
+
+            let fileUris = [];
+            const displayFileText = selectedFiles.length > 0 ? '\n\n*(Archivos adjuntos: ' + selectedFiles.map(f => f.name).join(', ') + ')*' : '';
+
+            activeChat.messages.push({ role: 'user', text: messageText + displayFileText });
+            saveState();
+            renderSidebar();
+            renderMessages();
+
+            inputField.value = "";
+            const filesToUpload = [...selectedFiles];
+            selectedFiles = [];
+            renderFilePreview();
+
+            currentAbortController = new AbortController();
+            setSendButtonMode(true);
+
+            try {
+                if (filesToUpload.length > 0) {
+                    for (const file of filesToUpload) {
+                        const uploaded = await uploadFileToGemini(file);
+                        fileUris.push(uploaded);
+                    }
+                }
+
+                const historyContext = activeChat.messages.slice(-6).map(h => (h.role === 'user' ? 'Usuario' : 'Asistente') + ': ' + h.text).join('\n');
+
+                const response = await fetch("/api/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    signal: currentAbortController.signal,
+                    body: JSON.stringify({
+                        message: historyContext,
+                        fileUris: fileUris
+                    })
+                });
+
+                if (!response.ok) {
+                    const errText = await response.text();
+                    throw new Error(errText);
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder("utf-8");
+                let fullText = "";
+                let buffer = "";
+
+                activeChat.messages.push({ role: 'model', text: "" });
+                const aiMessageIndex = activeChat.messages.length - 1;
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split("\n");
+                    buffer = lines.pop();
+
+                    for (const line of lines) {
+                        if (line.startsWith("data: ")) {
+                            const jsonStr = line.replace("data: ", "").trim();
+                            if (jsonStr === "[DONE]") break;
+                            try {
+                                const parsed = JSON.parse(jsonStr);
+                                const chunk = parsed.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                                fullText += chunk;
+                                activeChat.messages[aiMessageIndex].text = fullText;
+                                renderMessages();
+                            } catch (e) {}
+                        }
+                    }
+                }
+
+                saveState();
+
+            } catch (error) {
+                if (error.name !== 'AbortError') {
+                    activeChat.messages.push({ role: 'model', text: 'Error: ' + error.message });
+                    renderMessages();
+                }
+            }
+
+            setSendButtonMode(false);
+            currentAbortController = null;
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === "Enter") sendMessage();
+        }
+
+        if (!currentChatId || !chats[currentChatId]) {
+            createNewChat();
+        } else {
+            renderSidebar();
+            renderMessages();
+        }
+    </script>
+</body>
+</html>
