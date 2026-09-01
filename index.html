@@ -113,8 +113,8 @@
     </div>
 
     <script>
-        // Tu URL exacta de Cloudflare Worker (corregida sin tilde)
         const WORKER_URL = "/api/chat";
+
         async function sendMessage() {
             const inputField = document.getElementById("userInput");
             const messageText = inputField.value.trim();
@@ -122,7 +122,7 @@
 
             const chatMessages = document.getElementById("chatMessages");
 
-            // Mostrar mensaje del usuario
+            // 1. Mostrar el mensaje del usuario
             const userDiv = document.createElement("div");
             userDiv.className = "message user-message";
             userDiv.textContent = messageText;
@@ -131,7 +131,7 @@
             inputField.value = "";
             chatMessages.scrollTop = chatMessages.scrollHeight;
 
-            // Mostrar estado de carga temporal ("Pensando...")
+            // 2. Crear el elemento visual temporal "Pensando..."
             const loadingDiv = document.createElement("div");
             loadingDiv.className = "message ai-message";
             loadingDiv.textContent = "Pensando...";
@@ -139,7 +139,7 @@
             chatMessages.scrollTop = chatMessages.scrollHeight;
 
             try {
-                // Enviar petición POST a tu Worker de Cloudflare
+                // 3. Petición POST al endpoint /api/chat
                 const response = await fetch(WORKER_URL, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -148,9 +148,11 @@
 
                 const data = await response.json();
                 
-                // Mostrar respuesta real de Gemini
+                // 4. Actualizar el texto del mensaje temporal con la respuesta final de la IA
                 if (data.reply) {
                     loadingDiv.textContent = data.reply;
+                } else if (data.error) {
+                    loadingDiv.textContent = "Error: " + data.error;
                 } else {
                     loadingDiv.textContent = "Respuesta vacía del servidor.";
                 }
