@@ -3,100 +3,185 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mi Asistente</title>
+    <title>Mi Asistente IA</title>
+    <!-- Fuente Inter y librería Markdown -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
         body {
-            font-family: Arial, sans-serif;
-            background-color: #121212;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: #0d0e12;
             background-image: url('Sharingan.jpg');
             background-position: center;
             background-repeat: no-repeat;
             background-size: cover;
             background-attachment: fixed;
-            color: #ffffff;
-            margin: 0;
+            color: #e2e8f0;
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
         }
+
+        /* Contenedor principal estilo cristal moderno */
         .chat-container {
             width: 100%;
-            max-width: 450px;
-            height: 85vh;
-            background: rgba(30, 30, 30, 0.95);
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            max-width: 580px;
+            height: 88vh;
+            background: rgba(18, 20, 26, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 18px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.7);
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            border: 1px solid #333;
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
+
         .chat-header {
-            background: #2d2d2d;
-            color: white;
-            padding: 15px;
-            text-align: center;
-            font-weight: bold;
-            border-bottom: 1px solid #444;
+            background: rgba(26, 29, 38, 0.9);
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
         }
+
+        .avatar-header {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #ef4444, #991b1b);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: #ffffff;
+            font-size: 14px;
+            box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+        }
+
+        .header-info h2 {
+            font-size: 15px;
+            font-weight: 600;
+            color: #f8fafc;
+        }
+
+        .header-info p {
+            font-size: 12px;
+            color: #10b981;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 2px;
+        }
+
+        .status-dot {
+            width: 7px;
+            height: 7px;
+            background-color: #10b981;
+            border-radius: 50%;
+            display: inline-block;
+            box-shadow: 0 0 8px #10b981;
+        }
+
         .chat-messages {
             flex: 1;
-            padding: 15px;
+            padding: 20px;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 14px;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
         }
+
         .message {
-            padding: 10px 14px;
-            border-radius: 8px;
-            max-width: 80%;
-            word-wrap: break-word;
+            padding: 12px 16px;
+            border-radius: 14px;
+            max-width: 82%;
             font-size: 14px;
-            white-space: pre-wrap;
+            line-height: 1.55;
+            word-wrap: break-word;
         }
+
+        .message p {
+            margin-bottom: 8px;
+        }
+
+        .message p:last-child {
+            margin-bottom: 0;
+        }
+
         .user-message {
-            background: #3b82f6;
-            color: white;
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            color: #ffffff;
             align-self: flex-end;
+            border-bottom-right-radius: 4px;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
         }
+
         .ai-message {
-            background: #2a2a2a;
-            color: #e5e7eb;
+            background: rgba(30, 34, 45, 0.9);
+            color: #e2e8f0;
             align-self: flex-start;
-            border: 1px solid #444;
+            border-bottom-left-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
         }
+
+        .chat-input-container {
+            padding: 16px;
+            background: rgba(22, 25, 34, 0.95);
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
         .chat-input-area {
             display: flex;
-            border-top: 1px solid #333;
-            padding: 12px;
-            background: #1e1e1e;
+            background: rgba(33, 38, 50, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 12px;
+            padding: 6px 8px 6px 14px;
+            align-items: center;
+            transition: border-color 0.2s;
         }
+
+        .chat-input-area:focus-within {
+            border-color: #ef4444;
+        }
+
         .chat-input-area input {
             flex: 1;
-            padding: 10px;
-            background: #2d2d2d;
-            border: 1px solid #444;
-            color: white;
-            border-radius: 6px;
+            background: transparent;
+            border: none;
+            color: #f8fafc;
+            font-size: 14px;
             outline: none;
+            font-family: inherit;
         }
-        .chat-input-area input:focus {
-            border-color: #3b82f6;
-        }
+
         .chat-input-area button {
-            background: #3b82f6;
+            background: #ef4444;
             color: white;
             border: none;
-            padding: 10px 16px;
-            margin-left: 8px;
-            border-radius: 6px;
+            padding: 8px 16px;
+            border-radius: 8px;
             cursor: pointer;
-            font-weight: bold;
+            font-weight: 600;
+            font-size: 13px;
+            transition: background 0.2s;
         }
+
         .chat-input-area button:hover {
-            background: #2563eb;
+            background: #dc2626;
         }
     </style>
 </head>
@@ -104,17 +189,22 @@
 
     <div class="chat-container">
         <div class="chat-header">
-            <div>Mi Asistente</div>
-            <div style="font-size: 11px; color: #888; font-weight: normal;">Tu asistente personal</div>
+            <div class="avatar-header">IA</div>
+            <div class="header-info">
+                <h2>Mi Asistente</h2>
+                <p><span class="status-dot"></span>En línea</p>
+            </div>
         </div>
         
         <div class="chat-messages" id="chatMessages">
             <div class="message ai-message">El sistema está preparado. ¿En qué puedo ayudarte?</div>
         </div>
         
-        <div class="chat-input-area">
-            <input type="text" id="userInput" placeholder="Escribe algo..." onkeypress="handleKeyPress(event)">
-            <button onclick="sendMessage()">Enviar</button>
+        <div class="chat-input-container">
+            <div class="chat-input-area">
+                <input type="text" id="userInput" placeholder="Escribe un mensaje..." onkeypress="handleKeyPress(event)">
+                <button onclick="sendMessage()">Enviar</button>
+            </div>
         </div>
     </div>
 
@@ -128,7 +218,7 @@
 
             const chatMessages = document.getElementById("chatMessages");
 
-            // 1. Mostrar mensaje del usuario
+            // 1. Crear mensaje del usuario
             const userDiv = document.createElement("div");
             userDiv.className = "message user-message";
             userDiv.textContent = messageText;
@@ -137,10 +227,9 @@
             inputField.value = "";
             chatMessages.scrollTop = chatMessages.scrollHeight;
 
-            // 2. Crear caja de respuesta vacía
+            // 2. Crear contenedor de la respuesta de la IA
             const loadingDiv = document.createElement("div");
             loadingDiv.className = "message ai-message";
-            loadingDiv.textContent = "";
             chatMessages.appendChild(loadingDiv);
 
             try {
@@ -152,16 +241,17 @@
 
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder("utf-8");
+                let fullText = "";
                 let buffer = "";
 
-                // 3. Procesar el flujo de datos conforme llegan los paquetes
+                // 3. Recepción en tiempo real (Streaming)
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
 
                     buffer += decoder.decode(value, { stream: true });
                     const lines = buffer.split("\n");
-                    buffer = lines.pop(); // Mantener línea incompleta en el buffer
+                    buffer = lines.pop();
 
                     for (const line of lines) {
                         if (line.startsWith("data: ")) {
@@ -169,12 +259,12 @@
                             if (jsonStr === "[DONE]") break;
                             try {
                                 const parsed = JSON.parse(jsonStr);
-                                const textChunk = parsed.candidates?.[0]?.content?.parts?.[0]?.text || "";
-                                loadingDiv.textContent += textChunk;
+                                const chunk = parsed.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                                fullText += chunk;
+                                // Renderizado de Markdown en tiempo real
+                                loadingDiv.innerHTML = marked.parse(fullText);
                                 chatMessages.scrollTop = chatMessages.scrollHeight;
-                            } catch (e) {
-                                // Ignorar bloques mal formateados
-                            }
+                            } catch (e) {}
                         }
                     }
                 }
