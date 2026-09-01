@@ -63,29 +63,52 @@ export default {
           const hasFiles = body.fileUris && Array.isArray(body.fileUris) && body.fileUris.length > 0;
 
           if (!groqKey && !apiKey) {
-            return new Response("Error: No se han encontrado variables de entorno GROQ_API_KEY ni GEMINI_API_KEY.", { status: 500, headers: corsHeaders });
+            return new Response("Error: No hay claves GROQ_API_KEY ni GEMINI_API_KEY configuradas.", { status: 500, headers: corsHeaders });
           }
 
-          // 1. Si es solo texto y tenemos Groq, probamos con llama-3.3-70b-versatile
+          // 1. Intentar con Groq si es petición de solo texto
           if (!hasFiles && groqKey) {
-            const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-              method: "POST",
-              headers: {
-                "Authorization": `Bearer ${groqKey.trim()}`,
-                "Content-Type": "application/json"
-              },
-              body: JSON.stringify({
-                model: "llama-3.3-70b-versatile",
-                messages: [{ role: "user", content: body.message || "Hola" }]
-              })
-            });
+            // Lista de modelos a probar en orden de preferencia
+            const candidateModels = [
+              "llama-3.1-8b-instant",
+              "llama-3.3-70b-versatile",
+              "openai/gpt-oss-120b",
+              "openai/gpt-oss-20b"
+            ];
 
-            if (groqRes.ok) {
-              const groqData = await groqRes.json();
-              const replyText = groqData.choices?.[0]?.message?.content || "Sin respuesta.";
+            let groqResponseText = null;
+            let lastGroqError = null;
 
+            for (const modelId of candidateModels) {
+              try {
+                const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+                  method: "POST",
+                  headers: {
+                    "Authorization": `Bearer ${groqKey.trim()}`,
+                    "Content-Type": "application/json"
+                  },
+                  body: JSON.stringify({
+                    model: modelId,
+                    messages: [{ role: "user", content: body.message || "Hola" }]
+                  })
+                });
+
+                if (groqRes.ok) {
+                  const groqData = await groqRes.json();
+                  groqResponseText = groqData.choices?.[0]?.message?.content || "Sin respuesta.";
+                  break; // ¡Éxito! Salimos del bucle
+                } else {
+                  lastGroqError = await groqRes.text();
+                }
+              } catch (err) {
+                lastGroqError = err.message;
+              }
+            }
+
+            // Si uno de los modelos de Groq respondió correctamente
+            if (groqResponseText) {
               const sseFormatted = `data: ${JSON.stringify({
-                candidates: [{ content: { parts: [{ text: replyText }] } }]
+                candidates: [{ content: { parts: [{ text: groqResponseText }] } }]
               })}\n\ndata: [DONE]\n\n`;
 
               return new Response(sseFormatted, {
@@ -95,13 +118,15 @@ export default {
                   ...corsHeaders
                 }
               });
-            } else {
-              const groqErrText = await groqRes.text();
-              return new Response(`Groq Error (${groqRes.status}): ${groqErrText}`, { status: 500, headers: corsHeaders });
+            }
+
+            // Si todos los modelos de Groq fallaron y NO hay clave de Gemini, devolver el error detallado
+            if (!apiKey) {
+              return new Response(`Error en Groq (todos los modelos fallaron): ${lastGroqError}`, { status: 500, headers: corsHeaders });
             }
           }
 
-          // 2. Si contiene archivos o no hay clave de Groq, enviamos a Gemini
+          // 2. Si hay archivos, o si falló Groq, usar Gemini
           if (apiKey) {
             const parts = [];
             if (body.message) parts.push({ text: body.message });
@@ -139,11 +164,11 @@ export default {
               });
             } else {
               const geminiErrText = await geminiResponse.text();
-              return new Response(`Gemini Error (${geminiResponse.status}): ${geminiErrText}`, { status: 500, headers: corsHeaders });
+              return new Response(`Error de Gemini (${geminiResponse.status}): ${geminiErrText}`, { status: 500, headers: corsHeaders });
             }
           }
 
-          return new Response("No se configuró ninguna API disponible.", { status: 500, headers: corsHeaders });
+          return new Response("No se pudo completar la solicitud con los proveedores disponibles.", { status: 500, headers: corsHeaders });
 
         } catch (err) {
           return new Response(`Error interno: ${err.message}`, { status: 500, headers: corsHeaders });
