@@ -18,7 +18,8 @@ export default {
             });
           }
 
-          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiApiKey}`;
+          // CORREGIDO: gemini-1.5-flash (sin '-latest')
+          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
 
           let parts = [{ text: body.message || "Analiza estos archivos:" }];
           body.fileUris.forEach(file => {
@@ -52,13 +53,8 @@ export default {
 
         // --- CASO B: SOLO TEXTO -> GROK (xAI) ---
         else {
-          const grokApiKey = env.GROK_API_KEY || env.XAI_API_KEY;
-          if (!grokApiKey) {
-            return new Response(JSON.stringify({ error: "Falta la variable GROK_API_KEY (o XAI_API_KEY) en Cloudflare" }), { 
-              status: 400, 
-              headers: { "Content-Type": "application/json" } 
-            });
-          }
+          // PON AQUÍ TU API KEY REAL DE xAI (debe empezar por 'xai-')
+          const grokApiKey = "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"; 
 
           const grokUrl = "https://api.x.ai/v1/chat/completions";
 
@@ -149,7 +145,6 @@ export default {
       }
     }
 
-    // Para cualquier otra ruta que no sea de la API:
     return new Response("Not Found", { status: 404 });
   }
 };
