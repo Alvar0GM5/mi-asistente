@@ -9,11 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -25,24 +21,97 @@
             background-attachment: fixed;
             color: #e2e8f0;
             display: flex;
-            justify-content: center;
-            align-items: center;
             height: 100vh;
+            overflow: hidden;
         }
 
-        .chat-container {
+        /* Contenedor Principal */
+        .app-container {
+            display: flex;
             width: 100%;
-            max-width: 600px;
-            height: 90vh;
-            background: rgba(18, 20, 26, 0.88);
-            backdrop-filter: blur(14px);
-            -webkit-backdrop-filter: blur(14px);
-            border-radius: 18px;
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.7);
+            height: 100vh;
+            background: rgba(13, 14, 18, 0.75);
+            backdrop-filter: blur(8px);
+        }
+
+        /* Panel Lateral (Sidebar) */
+        .sidebar {
+            width: 260px;
+            background: rgba(18, 20, 26, 0.95);
+            border-right: 1px solid rgba(255, 255, 255, 0.08);
             display: flex;
             flex-direction: column;
+            padding: 16px;
+            gap: 16px;
+        }
+
+        .new-chat-btn {
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: background 0.2s;
+        }
+
+        .new-chat-btn:hover { background: #dc2626; }
+
+        .chat-list {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .chat-item {
+            padding: 10px 12px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.03);
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+            color: #94a3b8;
+            border: 1px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .chat-item:hover, .chat-item.active {
+            background: rgba(255, 255, 255, 0.08);
+            color: #f8fafc;
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .chat-title {
+            white-space: nowrap;
             overflow: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            text-overflow: ellipsis;
+            max-width: 170px;
+        }
+
+        .delete-chat {
+            color: #ef4444;
+            opacity: 0.6;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .delete-chat:hover { opacity: 1; }
+
+        /* Área de Chat */
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
         }
 
         .chat-header {
@@ -50,7 +119,6 @@
             padding: 16px 20px;
             display: flex;
             align-items: center;
-            gap: 12px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.08);
         }
 
@@ -65,31 +133,7 @@
             font-weight: 700;
             color: #ffffff;
             font-size: 14px;
-            box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
-        }
-
-        .header-info h2 {
-            font-size: 15px;
-            font-weight: 600;
-            color: #f8fafc;
-        }
-
-        .header-info p {
-            font-size: 12px;
-            color: #10b981;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            margin-top: 2px;
-        }
-
-        .status-dot {
-            width: 7px;
-            height: 7px;
-            background-color: #10b981;
-            border-radius: 50%;
-            display: inline-block;
-            box-shadow: 0 0 8px #10b981;
+            margin-right: 12px;
         }
 
         .chat-messages {
@@ -99,28 +143,22 @@
             display: flex;
             flex-direction: column;
             gap: 14px;
-            scrollbar-width: thin;
-            scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
         }
 
         .message {
             padding: 12px 16px;
             border-radius: 14px;
-            max-width: 85%;
+            max-width: 80%;
             font-size: 14px;
             line-height: 1.55;
             word-wrap: break-word;
         }
-
-        .message p { margin-bottom: 8px; }
-        .message p:last-child { margin-bottom: 0; }
 
         .user-message {
             background: linear-gradient(135deg, #2563eb, #1d4ed8);
             color: #ffffff;
             align-self: flex-end;
             border-bottom-right-radius: 4px;
-            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
         }
 
         .ai-message {
@@ -132,36 +170,9 @@
         }
 
         .chat-input-container {
-            padding: 12px 16px 16px;
+            padding: 16px;
             background: rgba(22, 25, 34, 0.95);
             border-top: 1px solid rgba(255, 255, 255, 0.08);
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .preview-list {
-            display: flex;
-            gap: 8px;
-            overflow-x: auto;
-            padding-bottom: 4px;
-        }
-
-        .preview-item {
-            background: rgba(255, 255, 255, 0.1);
-            padding: 4px 8px;
-            border-radius: 6px;
-            font-size: 12px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            white-space: nowrap;
-        }
-
-        .remove-file {
-            cursor: pointer;
-            color: #ef4444;
-            font-weight: bold;
         }
 
         .chat-input-area {
@@ -172,11 +183,6 @@
             padding: 6px 8px;
             align-items: center;
             gap: 8px;
-            transition: border-color 0.2s;
-        }
-
-        .chat-input-area:focus-within {
-            border-color: #ef4444;
         }
 
         .chat-input-area input[type="text"] {
@@ -186,23 +192,6 @@
             color: #f8fafc;
             font-size: 14px;
             outline: none;
-            font-family: inherit;
-        }
-
-        .attach-btn {
-            background: transparent;
-            border: none;
-            color: #94a3b8;
-            cursor: pointer;
-            padding: 6px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: color 0.2s;
-        }
-
-        .attach-btn:hover {
-            color: #f8fafc;
         }
 
         .send-btn {
@@ -213,172 +202,190 @@
             border-radius: 8px;
             cursor: pointer;
             font-weight: 600;
-            font-size: 13px;
-            transition: background 0.2s;
         }
 
-        .send-btn:hover {
-            background: #dc2626;
-        }
-
-        #fileInput {
-            display: none;
-        }
+        .send-btn.stop-mode { background: #64748b; }
     </style>
 </head>
 <body>
 
-    <div class="chat-container">
-        <div class="chat-header">
-            <div class="avatar-header">IA</div>
-            <div class="header-info">
-                <h2>Mi Asistente</h2>
-                <p><span class="status-dot"></span>En línea</p>
+    <div class="app-container">
+        <div class="sidebar">
+            <button class="new-chat-btn" onclick="createNewChat()">+ Nueva conversación</button>
+            <div class="chat-list" id="chatList"></div>
+        </div>
+
+        <div class="chat-container">
+            <div class="chat-header">
+                <div class="avatar-header">IA</div>
+                <div>
+                    <h2 style="font-size: 15px;">Mi Asistente</h2>
+                    <p style="font-size: 12px; color: #10b981;">En línea</p>
+                </div>
             </div>
-        </div>
-        
-        <div class="chat-messages" id="chatMessages">
-            <div class="message ai-message">Sistema actualizado a máxima velocidad. Puedes enviarme mensajes, imágenes, PDFs o vídeos de cualquier tamaño.</div>
-        </div>
-        
-        <div class="chat-input-container">
-            <div class="preview-list" id="previewList"></div>
-            
-            <div class="chat-input-area">
-                <button class="attach-btn" onclick="document.getElementById('fileInput').click()" title="Adjuntar archivo">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
-                    </svg>
-                </button>
-                <input type="file" id="fileInput" multiple onchange="handleFileSelect(event)">
-                
-                <input type="text" id="userInput" placeholder="Escribe un mensaje..." onkeypress="handleKeyPress(event)">
-                <button class="send-btn" id="sendBtn" onclick="sendMessage()">Enviar</button>
+
+            <div class="chat-messages" id="chatMessages"></div>
+
+            <div class="chat-input-container">
+                <div class="chat-input-area">
+                    <input type="text" id="userInput" placeholder="Escribe un mensaje..." onkeypress="handleKeyPress(event)">
+                    <button class="send-btn" id="sendBtn" onclick="toggleSendOrStop()">Enviar</button>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
-        let selectedFiles = [];
+        let chats = JSON.parse(localStorage.getItem("ai_chats")) || {};
+        let currentChatId = localStorage.getItem("current_chat_id") || null;
+        let currentAbortController = null;
 
-        function handleFileSelect(event) {
-            const files = Array.from(event.target.files);
-            files.forEach(file => {
-                selectedFiles.push(file);
-            });
-            updatePreview();
-            event.target.value = "";
+        function saveState() {
+            localStorage.setItem("ai_chats", JSON.stringify(chats));
+            localStorage.setItem("current_chat_id", currentChatId);
         }
 
-        function removeFile(index) {
-            selectedFiles.splice(index, 1);
-            updatePreview();
+        function init() {
+            if (!currentChatId || !chats[currentChatId]) {
+                createNewChat();
+            } else {
+                renderSidebar();
+                renderMessages();
+            }
         }
 
-        function updatePreview() {
-            const previewList = document.getElementById("previewList");
-            previewList.innerHTML = "";
-            selectedFiles.forEach((file, index) => {
-                const item = document.createElement("div");
-                item.className = "preview-item";
-                item.innerHTML = `<span>📄 ${file.name}</span> <span class="remove-file" onclick="removeFile(${index})">&times;</span>`;
-                previewList.appendChild(item);
-            });
-        }
-
-        async function uploadFileToGemini(file) {
-            const initRes = await fetch("/api/upload", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    displayName: file.name,
-                    mimeType: file.type || "application/octet-stream",
-                    numBytes: file.size
-                })
-            });
-
-            if (!initRes.ok) throw new Error("No se pudo iniciar la subida del archivo.");
-
-            const { uploadUrl } = await initRes.json();
-
-            const uploadRes = await fetch(uploadUrl, {
-                method: "POST",
-                headers: {
-                    "X-Goog-Upload-Offset": "0",
-                    "X-Goog-Upload-Command": "upload, finalize"
-                },
-                body: file
-            });
-
-            if (!uploadRes.ok) throw new Error("Fallo la subida directa del archivo.");
-
-            const result = await uploadRes.json();
-            return {
-                fileUri: result.file.uri,
-                mimeType: result.file.mimeType
+        function createNewChat() {
+            const id = "chat_" + Date.now();
+            chats[id] = {
+                title: "Nueva conversación",
+                messages: [{ role: "model", text: "¡Hola! ¿En qué puedo ayudarte hoy?" }]
             };
+            currentChatId = id;
+            saveState();
+            renderSidebar();
+            renderMessages();
+        }
+
+        function switchChat(id) {
+            currentChatId = id;
+            saveState();
+            renderSidebar();
+            renderMessages();
+        }
+
+        function deleteChat(id, event) {
+            event.stopPropagation();
+            delete chats[id];
+            const keys = Object.keys(chats);
+            if (keys.length > 0) {
+                currentChatId = keys[0];
+            } else {
+                createNewChat();
+                return;
+            }
+            saveState();
+            renderSidebar();
+            renderMessages();
+        }
+
+        function renderSidebar() {
+            const chatList = document.getElementById("chatList");
+            chatList.innerHTML = "";
+
+            Object.keys(chats).reverse().forEach(id => {
+                const item = document.createElement("div");
+                item.className = `chat-item ${id === currentChatId ? 'active' : ''}`;
+                item.onclick = () => switchChat(id);
+
+                item.innerHTML = `
+                    <span class="chat-title">${chats[id].title}</span>
+                    <span class="delete-chat" onclick="deleteChat('${id}', event)">&times;</span>
+                `;
+                chatList.appendChild(item);
+            });
+        }
+
+        function renderMessages() {
+            const chatMessages = document.getElementById("chatMessages");
+            chatMessages.innerHTML = "";
+
+            const activeChat = chats[currentChatId];
+            if (!activeChat) return;
+
+            activeChat.messages.forEach(msg => {
+                const div = document.createElement("div");
+                div.className = `message ${msg.role === 'user' ? 'user-message' : 'ai-message'}`;
+                div.innerHTML = marked.parse(msg.text);
+                chatMessages.appendChild(div);
+            });
+
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function toggleSendOrStop() {
+            if (currentAbortController) {
+                currentAbortController.abort();
+                currentAbortController = null;
+                setSendButtonMode(false);
+            } else {
+                sendMessage();
+            }
+        }
+
+        function setSendButtonMode(isGenerating) {
+            const sendBtn = document.getElementById("sendBtn");
+            if (isGenerating) {
+                sendBtn.textContent = "Detener";
+                sendBtn.classList.add("stop-mode");
+            } else {
+                sendBtn.textContent = "Enviar";
+                sendBtn.classList.remove("stop-mode");
+            }
         }
 
         async function sendMessage() {
             const inputField = document.getElementById("userInput");
-            const sendBtn = document.getElementById("sendBtn");
             const messageText = inputField.value.trim();
-            if (!messageText && selectedFiles.length === 0) return;
+            if (!messageText) return;
 
-            const chatMessages = document.getElementById("chatMessages");
+            const activeChat = chats[currentChatId];
 
-            const userDiv = document.createElement("div");
-            userDiv.className = "message user-message";
-            let displayContent = messageText;
-            if (selectedFiles.length > 0) {
-                const fileNames = selectedFiles.map(f => f.name).join(", ");
-                displayContent += (displayContent ? "\n\n" : "") + `📎 [Archivos: ${fileNames}]`;
+            // Renombrar el título con el primer mensaje del usuario
+            if (activeChat.messages.length <= 1) {
+                activeChat.title = messageText.slice(0, 25) + "...";
             }
-            userDiv.textContent = displayContent;
-            chatMessages.appendChild(userDiv);
 
-            const filesToUpload = [...selectedFiles];
-            selectedFiles = [];
-            updatePreview();
+            activeChat.messages.push({ role: 'user', text: messageText });
+            saveState();
+            renderSidebar();
+            renderMessages();
+
             inputField.value = "";
-            chatMessages.scrollTop = chatMessages.scrollHeight;
 
-            const loadingDiv = document.createElement("div");
-            loadingDiv.className = "message ai-message";
-            loadingDiv.textContent = filesToUpload.length > 0 ? "Procesando y subiendo archivos..." : "Pensando...";
-            chatMessages.appendChild(loadingDiv);
+            // Contexto histórico para el envío
+            const historyContext = activeChat.messages.slice(-6).map(h => `${h.role === 'user' ? 'Usuario' : 'Asistente'}: ${h.text}`).join('\n');
 
-            sendBtn.disabled = true;
+            currentAbortController = new AbortController();
+            setSendButtonMode(true);
 
             try {
-                const uploadedFileUris = [];
-                for (const file of filesToUpload) {
-                    const uploaded = await uploadFileToGemini(file);
-                    uploadedFileUris.push(uploaded);
-                }
-
-                if (filesToUpload.length > 0) {
-                    loadingDiv.textContent = "Generando respuesta...";
-                }
-
                 const response = await fetch("/api/chat", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ message: messageText, fileUris: uploadedFileUris })
+                    signal: currentAbortController.signal,
+                    body: JSON.stringify({ message: historyContext })
                 });
 
-                if (!response.ok) {
-                    const errText = await response.text();
-                    loadingDiv.textContent = `Error: ${errText}`;
-                    sendBtn.disabled = false;
-                    return;
-                }
+                if (!response.ok) throw new Error("Error en la petición");
 
-                loadingDiv.textContent = "";
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder("utf-8");
                 let fullText = "";
                 let buffer = "";
+
+                // Agregar mensaje de la IA en preparación
+                activeChat.messages.push({ role: 'model', text: "" });
+                const aiMessageIndex = activeChat.messages.length - 1;
 
                 while (true) {
                     const { done, value } = await reader.read();
@@ -396,25 +403,31 @@
                                 const parsed = JSON.parse(jsonStr);
                                 const chunk = parsed.candidates?.[0]?.content?.parts?.[0]?.text || "";
                                 fullText += chunk;
-                                loadingDiv.innerHTML = marked.parse(fullText);
-                                chatMessages.scrollTop = chatMessages.scrollHeight;
+                                activeChat.messages[aiMessageIndex].text = fullText;
+                                renderMessages();
                             } catch (e) {}
                         }
                     }
                 }
+
+                saveState();
+
             } catch (error) {
-                loadingDiv.textContent = `Error de conexión: ${error.message}`;
+                if (error.name !== 'AbortError') {
+                    activeChat.messages.push({ role: 'model', text: `Error de conexión: ${error.message}` });
+                    renderMessages();
+                }
             }
 
-            sendBtn.disabled = false;
-            chatMessages.scrollTop = chatMessages.scrollHeight;
+            setSendButtonMode(false);
+            currentAbortController = null;
         }
 
         function handleKeyPress(event) {
-            if (event.key === "Enter") {
-                sendMessage();
-            }
+            if (event.key === "Enter") sendMessage();
         }
+
+        init();
     </script>
 </body>
 </html>
