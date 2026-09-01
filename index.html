@@ -96,4 +96,448 @@
         }
 
         .delete-chat {
-            color
+            color: #ef4444;
+            opacity: 0.6;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .delete-chat:hover { opacity: 1; }
+
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .chat-header {
+            background: rgba(26, 29, 38, 0.9);
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .avatar-header {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #ef4444, #991b1b);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: #ffffff;
+            font-size: 14px;
+            margin-right: 12px;
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .message {
+            padding: 12px 16px;
+            border-radius: 14px;
+            max-width: 80%;
+            font-size: 14px;
+            line-height: 1.55;
+            word-wrap: break-word;
+        }
+
+        .user-message {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            color: #ffffff;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+
+        .ai-message {
+            background: rgba(30, 34, 45, 0.9);
+            color: #e2e8f0;
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .chat-input-container {
+            padding: 16px;
+            background: rgba(22, 25, 34, 0.95);
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .file-preview {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .file-badge {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .remove-file {
+            cursor: pointer;
+            color: #ef4444;
+            font-weight: bold;
+        }
+
+        .chat-input-area {
+            display: flex;
+            background: rgba(33, 38, 50, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 12px;
+            padding: 6px 8px;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .attach-btn {
+            background: transparent;
+            border: none;
+            color: #94a3b8;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 6px;
+            transition: color 0.2s;
+        }
+
+        .attach-btn:hover { color: #f8fafc; }
+
+        .chat-input-area input[type="text"] {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: #f8fafc;
+            font-size: 14px;
+            outline: none;
+        }
+
+        .send-btn {
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .send-btn.stop-mode { background: #64748b; }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <div class="sidebar">
+            <button class="new-chat-btn" onclick="createNewChat()">+ Nueva conversación</button>
+            <div class="chat-list" id="chatList"></div>
+        </div>
+
+        <div class="chat-container">
+            <div class="chat-header">
+                <div class="avatar-header">IA</div>
+                <div>
+                    <h2 style="font-size: 15px;">Mi Asistente</h2>
+                    <p style="font-size: 12px; color: #10b981;">En línea</p>
+                </div>
+            </div>
+
+            <div class="chat-messages" id="chatMessages"></div>
+
+            <div class="chat-input-container">
+                <div class="file-preview" id="filePreview"></div>
+                <div class="chat-input-area">
+                    <button class="attach-btn" onclick="openFileSelector()" title="Adjuntar archivo">📎</button>
+                    <input type="file" id="fileInput" multiple style="display: none;" onchange="handleFileSelect(event)">
+                    <input type="text" id="userInput" placeholder="Escribe un mensaje..." onkeypress="handleKeyPress(event)">
+                    <button class="send-btn" id="sendBtn" onclick="toggleSendOrStop()">Enviar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let chats = {};
+        let currentChatId = null;
+        let currentAbortController = null;
+        let selectedFiles = [];
+
+        try {
+            chats = JSON.parse(localStorage.getItem("ai_chats")) || {};
+            currentChatId = localStorage.getItem("current_chat_id") || null;
+        } catch (e) {
+            chats = {};
+            currentChatId = null;
+        }
+
+        function saveState() {
+            localStorage.setItem("ai_chats", JSON.stringify(chats));
+            localStorage.setItem("current_chat_id", currentChatId);
+        }
+
+        function createNewChat() {
+            const id = "chat_" + Date.now();
+            chats[id] = {
+                title: "Nueva conversación",
+                messages: [{ role: "model", text: "¡Hola! ¿En qué puedo ayudarte hoy?" }]
+            };
+            currentChatId = id;
+            saveState();
+            renderSidebar();
+            renderMessages();
+        }
+
+        function switchChat(id) {
+            currentChatId = id;
+            saveState();
+            renderSidebar();
+            renderMessages();
+        }
+
+        function deleteChat(id, event) {
+            event.stopPropagation();
+            delete chats[id];
+            const keys = Object.keys(chats);
+            if (keys.length > 0) {
+                currentChatId = keys[0];
+            } else {
+                createNewChat();
+                return;
+            }
+            saveState();
+            renderSidebar();
+            renderMessages();
+        }
+
+        function renderSidebar() {
+            const chatList = document.getElementById("chatList");
+            if (!chatList) return;
+            chatList.innerHTML = "";
+
+            Object.keys(chats).reverse().forEach(id => {
+                const item = document.createElement("div");
+                item.className = "chat-item " + (id === currentChatId ? 'active' : '');
+                item.onclick = function() { switchChat(id); };
+
+                item.innerHTML = '<span class="chat-title">' + (chats[id].title || 'Conversación') + '</span>' +
+                                 '<span class="delete-chat" onclick="deleteChat(\'' + id + '\', event)">&times;</span>';
+                chatList.appendChild(item);
+            });
+        }
+
+        function renderMessages() {
+            const chatMessages = document.getElementById("chatMessages");
+            if (!chatMessages) return;
+            chatMessages.innerHTML = "";
+
+            const activeChat = chats[currentChatId];
+            if (!activeChat) return;
+
+            activeChat.messages.forEach(msg => {
+                const div = document.createElement("div");
+                div.className = "message " + (msg.role === 'user' ? 'user-message' : 'ai-message');
+                if (window.marked && typeof window.marked.parse === 'function') {
+                    div.innerHTML = window.marked.parse(msg.text || "");
+                } else {
+                    div.textContent = msg.text || "";
+                }
+                chatMessages.appendChild(div);
+            });
+
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function openFileSelector() {
+            document.getElementById('fileInput').click();
+        }
+
+        function handleFileSelect(event) {
+            const files = Array.from(event.target.files);
+            selectedFiles = selectedFiles.concat(files);
+            renderFilePreview();
+        }
+
+        function removeFile(index) {
+            selectedFiles.splice(index, 1);
+            renderFilePreview();
+        }
+
+        function renderFilePreview() {
+            const preview = document.getElementById("filePreview");
+            if (!preview) return;
+            preview.innerHTML = "";
+            selectedFiles.forEach((file, idx) => {
+                const badge = document.createElement("div");
+                badge.className = "file-badge";
+                badge.innerHTML = '<span>📄 ' + file.name + '</span>' +
+                                 '<span class="remove-file" onclick="removeFile(' + idx + ')">&times;</span>';
+                preview.appendChild(badge);
+            });
+        }
+
+        async function uploadFileToGemini(file) {
+            const formData = new FormData();
+            formData.append("file", file);
+
+            const res = await fetch("/api/upload", {
+                method: "POST",
+                body: formData
+            });
+
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.error || "Error al subir archivo");
+            }
+
+            return await res.json();
+        }
+
+        function toggleSendOrStop() {
+            if (currentAbortController) {
+                currentAbortController.abort();
+                currentAbortController = null;
+                setSendButtonMode(false);
+            } else {
+                sendMessage();
+            }
+        }
+
+        function setSendButtonMode(isGenerating) {
+            const sendBtn = document.getElementById("sendBtn");
+            if (!sendBtn) return;
+            if (isGenerating) {
+                sendBtn.textContent = "Detener";
+                sendBtn.classList.add("stop-mode");
+            } else {
+                sendBtn.textContent = "Enviar";
+                sendBtn.classList.remove("stop-mode");
+            }
+        }
+
+        async function sendMessage() {
+            const inputField = document.getElementById("userInput");
+            const messageText = inputField.value.trim();
+
+            if (!messageText && selectedFiles.length === 0) return;
+
+            const activeChat = chats[currentChatId];
+
+            if (activeChat.messages.length <= 1) {
+                activeChat.title = (messageText || selectedFiles[0]?.name || "Conversación").slice(0, 25) + "...";
+            }
+
+            let fileUris = [];
+            const displayFileText = selectedFiles.length > 0 ? '\n\n*(Archivos adjuntos: ' + selectedFiles.map(f => f.name).join(', ') + ')*' : '';
+
+            activeChat.messages.push({ role: 'user', text: messageText + displayFileText });
+            saveState();
+            renderSidebar();
+            renderMessages();
+
+            inputField.value = "";
+            const filesToUpload = [...selectedFiles];
+            selectedFiles = [];
+            renderFilePreview();
+
+            currentAbortController = new AbortController();
+            setSendButtonMode(true);
+
+            try {
+                if (filesToUpload.length > 0) {
+                    for (const file of filesToUpload) {
+                        const uploaded = await uploadFileToGemini(file);
+                        fileUris.push(uploaded);
+                    }
+                }
+
+                const historyContext = activeChat.messages.slice(-6).map(h => (h.role === 'user' ? 'Usuario' : 'Asistente') + ': ' + h.text).join('\n');
+
+                const response = await fetch("/api/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    signal: currentAbortController.signal,
+                    body: JSON.stringify({
+                        message: historyContext,
+                        fileUris: fileUris
+                    })
+                });
+
+                if (!response.ok) {
+                    const errText = await response.text();
+                    throw new Error(errText);
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder("utf-8");
+                let fullText = "";
+                let buffer = "";
+
+                activeChat.messages.push({ role: 'model', text: "" });
+                const aiMessageIndex = activeChat.messages.length - 1;
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split("\n");
+                    buffer = lines.pop();
+
+                    for (const line of lines) {
+                        if (line.startsWith("data: ")) {
+                            const jsonStr = line.replace("data: ", "").trim();
+                            if (jsonStr === "[DONE]") break;
+                            try {
+                                const parsed = JSON.parse(jsonStr);
+                                const chunk = parsed.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                                fullText += chunk;
+                                activeChat.messages[aiMessageIndex].text = fullText;
+                                renderMessages();
+                            } catch (e) {}
+                        }
+                    }
+                }
+
+                saveState();
+
+            } catch (error) {
+                if (error.name !== 'AbortError') {
+                    activeChat.messages.push({ role: 'model', text: 'Error: ' + error.message });
+                    renderMessages();
+                }
+            }
+
+            setSendButtonMode(false);
+            currentAbortController = null;
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === "Enter") sendMessage();
+        }
+
+        if (!currentChatId || !chats[currentChatId]) {
+            createNewChat();
+        } else {
+            renderSidebar();
+            renderMessages();
+        }
+    </script>
+</body>
+</html>
