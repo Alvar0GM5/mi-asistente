@@ -1,4 +1,4 @@
-  export default {
+export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
@@ -7,9 +7,9 @@
         const body = await request.json();
         const apiKey = env.GEMINI_API_KEY;
 
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?alt=sse&key=${apiKey}`;
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
-        let parts = [{ text: body.message || "" }];
+        let parts = [{ text: body.message || "Hola" }];
 
         if (body.fileUris && body.fileUris.length > 0) {
           body.fileUris.forEach(file => {
@@ -30,16 +30,26 @@
           })
         });
 
-        return new Response(response.body, {
-          headers: {
-            "Content-Type": "text/event-stream",
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive"
-          }
+        const data = await response.json();
+
+        if (!response.ok) {
+          return new Response(JSON.stringify({ error: data.error?.message || "Error en la API" }), {
+            status: response.status,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+
+        const replyText = data.candidates?.[0]?.content?.parts?.[0]?.text || "Sin respuesta.";
+
+        return new Response(JSON.stringify({ reply: replyText }), {
+          headers: { "Content-Type": "application/json" }
         });
 
       } catch (err) {
-        return new Response(err.message, { status: 500 });
+        return new Response(JSON.stringify({ error: err.message }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        });
       }
     }
 
