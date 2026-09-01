@@ -63,10 +63,10 @@ export default {
           const hasFiles = body.fileUris && Array.isArray(body.fileUris) && body.fileUris.length > 0;
 
           if (!groqKey && !apiKey) {
-            return new Response("Error: No se han encontrado variables de entorno GROQ_API_KEY ni GEMINI_API_KEY en Cloudflare.", { status: 500, headers: corsHeaders });
+            return new Response("Error: No se han encontrado variables de entorno GROQ_API_KEY ni GEMINI_API_KEY.", { status: 500, headers: corsHeaders });
           }
 
-          // 1. Si es solo texto, enviamos a GROQ usando el modelo compatible Llama 3
+          // 1. Si es solo texto y tenemos Groq, probamos con llama-3.3-70b-versatile
           if (!hasFiles && groqKey) {
             const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
               method: "POST",
@@ -75,7 +75,7 @@ export default {
                 "Content-Type": "application/json"
               },
               body: JSON.stringify({
-                model: "llama3-8b-8192",
+                model: "llama-3.3-70b-versatile",
                 messages: [{ role: "user", content: body.message || "Hola" }]
               })
             });
@@ -97,11 +97,11 @@ export default {
               });
             } else {
               const groqErrText = await groqRes.text();
-              return new Response(`Error de Groq (${groqRes.status}): ${groqErrText}`, { status: 500, headers: corsHeaders });
+              return new Response(`Groq Error (${groqRes.status}): ${groqErrText}`, { status: 500, headers: corsHeaders });
             }
           }
 
-          // 2. Si contiene archivos o no hay clave de Groq, usamos Gemini
+          // 2. Si contiene archivos o no hay clave de Groq, enviamos a Gemini
           if (apiKey) {
             const parts = [];
             if (body.message) parts.push({ text: body.message });
@@ -139,14 +139,14 @@ export default {
               });
             } else {
               const geminiErrText = await geminiResponse.text();
-              return new Response(`Error de Gemini (${geminiResponse.status}): ${geminiErrText}`, { status: 500, headers: corsHeaders });
+              return new Response(`Gemini Error (${geminiResponse.status}): ${geminiErrText}`, { status: 500, headers: corsHeaders });
             }
           }
 
-          return new Response("No hay ninguna clave configurada en el servidor.", { status: 500, headers: corsHeaders });
+          return new Response("No se configuró ninguna API disponible.", { status: 500, headers: corsHeaders });
 
         } catch (err) {
-          return new Response(`Error en el servidor: ${err.message}`, { status: 500, headers: corsHeaders });
+          return new Response(`Error interno: ${err.message}`, { status: 500, headers: corsHeaders });
         }
       }
     }
