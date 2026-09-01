@@ -52,7 +52,7 @@ export default {
       }
     }
 
-    // Endpoint 2: Chat con streaming ultra-rápido
+    // Endpoint 2: Chat con streaming ultra-rápido usando gemini-3.6-flash
     if (url.pathname === "/api/chat") {
       if (request.method === "POST") {
         try {
@@ -79,7 +79,7 @@ export default {
           }
 
           const geminiResponse = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${apiKey}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:streamGenerateContent?alt=sse&key=${apiKey}`,
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
