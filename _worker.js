@@ -2,26 +2,22 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    // Endpoint para enviar mensajes
+    // 1. CHAT (Texto -> Grok / Archivos -> Gemini)
     if (url.pathname === "/api/chat" && request.method === "POST") {
       try {
         const body = await request.json();
-        const apiKey = env.GEMINI_API_KEY;
+        const hasFiles = body.fileUris && body.fileUris.length > 0;
 
-        if (!apiKey) {
-          return new Response(JSON.stringify({ error: "Falta la variable GEMINI_API_KEY en Cloudflare" }), {
-            status: 500,
-            headers: { "Content-Type": "application/json" }
-          });
-        }
+        // --- CASO A: SI TIENE ARCHIVOS/IMÁGENES -> GEMINI ---
+        if (hasFiles) {
+          const geminiApiKey = env.GEMINI_API_KEY;
+          if (!geminiApiKey) {
+            return new Response(JSON.stringify({ error: "Falta la variable GEMINI_API_KEY en Cloudflare" }), { status: 500 });
+          }
 
-        // Modelo actualizado a gemini-1.5-flash-latest
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
+          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiApiKey}`;
 
-        let parts = [{ text: body.message || "Hola" }];
-
-        // Si vienen archivos adjuntos
-        if (body.fileUris && body.fileUris.length > 0) {
+          let parts = [{ text: body.message || "Analiza estos archivos:" }];
           body.fileUris.forEach(file => {
             parts.push({
               file_data: {
@@ -30,30 +26,58 @@ export default {
               }
             });
           });
-        }
 
-        const response = await fetch(geminiUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ role: "user", parts: parts }]
-          })
-        });
+          const response = await fetch(geminiUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ contents: [{ role: "user", parts: parts }] })
+          });
 
-        const data = await response.json();
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.error?.message || "Error en la API de Gemini");
+          }
 
-        if (!response.ok) {
-          return new Response(JSON.stringify({ error: data.error?.message || "Error en la API de Gemini" }), {
-            status: response.status,
+          const replyText = data.candidates?.[0]?.content?.parts?.[0]?.text || "Sin respuesta de Gemini.";
+          return new Response(JSON.stringify({ reply: replyText }), {
             headers: { "Content-Type": "application/json" }
           });
         }
 
-        const replyText = data.candidates?.[0]?.content?.parts?.[0]?.text || "Sin respuesta recibida del modelo.";
+        // --- CASO B: SOLO TEXTO -> GROK (xAI) ---
+        else {
+          // Busca la clave de Grok/xAI en tus variables de entorno
+          const grokApiKey = env.GROK_API_KEY || env.XAI_API_KEY;
+          if (!grokApiKey) {
+            return new Response(JSON.stringify({ error: "Falta la variable GROK_API_KEY (o XAI_API_KEY) en Cloudflare" }), { status: 500 });
+          }
 
-        return new Response(JSON.stringify({ reply: replyText }), {
-          headers: { "Content-Type": "application/json" }
-        });
+          const grokUrl = "https://api.x.ai/v1/chat/completions";
+
+          const response = await fetch(grokUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${grokApiKey}`
+            },
+            body: JSON.stringify({
+              model: "grok-beta",
+              messages: [
+                { role: "user", content: body.message || "Hola" }
+              ]
+            })
+          });
+
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.error?.message || "Error en la API de Grok");
+          }
+
+          const replyText = data.choices?.[0]?.message?.content || "Sin respuesta de Grok.";
+          return new Response(JSON.stringify({ reply: replyText }), {
+            headers: { "Content-Type": "application/json" }
+          });
+        }
 
       } catch (err) {
         return new Response(JSON.stringify({ error: err.message }), {
@@ -63,7 +87,7 @@ export default {
       }
     }
 
-    // Endpoint para subir archivos
+    // 2. SUBIDA DE ARCHIVOS A GEMINI
     if (url.pathname === "/api/upload" && request.method === "POST") {
       try {
         const apiKey = env.GEMINI_API_KEY;
@@ -108,7 +132,6 @@ export default {
       }
     }
 
-    // Servir la web estática si no es una ruta API
     return env.ASSETS.fetch(request);
   }
 };
