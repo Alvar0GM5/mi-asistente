@@ -15,7 +15,7 @@ export default {
     const apiKey = env.GEMINI_API_KEY;
     const groqKey = env.GROQ_API_KEY;
 
-    // Endpoint 1: Subida de archivos pesados a Gemini
+    // Endpoint 1: Subida de archivos (PDFs, Imágenes, Vídeos, Docs) a Gemini
     if (url.pathname === "/api/upload") {
       if (request.method === "POST") {
         try {
@@ -42,7 +42,7 @@ export default {
 
           if (!initRes.ok) {
             const errBody = await initRes.text();
-            return new Response(`Error al iniciar subida: ${errBody}`, { status: initRes.status, headers: corsHeaders });
+            return new Response(`Error al iniciar subida en Gemini: ${errBody}`, { status: initRes.status, headers: corsHeaders });
           }
 
           const uploadUrl = initRes.headers.get("X-Goog-Upload-URL");
@@ -55,56 +55,15 @@ export default {
       }
     }
 
-    // Endpoint 2: Chat con fallback automático a Groq API
+    // Endpoint 2: Chat con enrutamiento inteligente
     if (url.pathname === "/api/chat") {
       if (request.method === "POST") {
         try {
           const body = await request.json();
-          const parts = [];
+          const hasFiles = body.fileUris && Array.isArray(body.fileUris) && body.fileUris.length > 0;
 
-          if (body.message) {
-            parts.push({ text: body.message });
-          }
-
-          if (body.fileUris && Array.isArray(body.fileUris)) {
-            for (const file of body.fileUris) {
-              parts.push({
-                fileData: {
-                  mimeType: file.mimeType,
-                  fileUri: file.fileUri
-                }
-              });
-            }
-          }
-
-          // Intentar primero con Gemini
-          if (apiKey) {
-            const geminiResponse = await fetch(
-              `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:streamGenerateContent?alt=sse&key=${apiKey}`,
-              {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ contents: [{ parts: parts }] })
-              }
-            );
-
-            // Si Gemini responde correctamente, devolvemos su flujo
-            if (geminiResponse.ok) {
-              const { readable, writable } = new TransformStream();
-              geminiResponse.body.pipeTo(writable);
-              return new Response(readable, {
-                headers: {
-                  "Content-Type": "text/event-stream",
-                  "Cache-Control": "no-cache",
-                  "Connection": "keep-alive",
-                  ...corsHeaders
-                }
-              });
-            }
-          }
-
-          // Si Gemini falla (p. ej. error 429 por cuota) y tenemos clave de Groq, usamos Groq como respaldo
-          if (groqKey) {
+          // CASO 1: SOLO TEXTO -> Usamos GROQ (Rápido y Cuota ilimitada)
+          if (!hasFiles && groqKey) {
             const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
               method: "POST",
               headers: {
@@ -113,7 +72,7 @@ export default {
               },
               body: JSON.stringify({
                 model: "llama-3.3-70b-versatile",
-                messages: [{ role: "user", content: body.message || "Responde al usuario." }]
+                messages: [{ role: "user", content: body.message || "Hola" }]
               })
             });
 
@@ -121,7 +80,6 @@ export default {
               const groqData = await groqRes.json();
               const replyText = groqData.choices?.[0]?.message?.content || "Sin respuesta.";
 
-              // Formateamos la respuesta para que la interfaz la lea sin errores
               const sseFormatted = `data: ${JSON.stringify({
                 candidates: [{ content: { parts: [{ text: replyText }] } }]
               })}\n\ndata: [DONE]\n\n`;
@@ -136,10 +94,51 @@ export default {
             }
           }
 
-          return new Response("Ambas API (Gemini y Groq) han alcanzado su límite o fallado.", {
-            status: 429,
-            headers: corsHeaders
-          });
+          // CASO 2: TIENE ARCHIVOS (o Groq no estaba disponible) -> Usamos GEMINI
+          if (apiKey) {
+            const parts = [];
+            if (body.message) parts.push({ text: body.message });
+
+            if (hasFiles) {
+              for (const file of body.fileUris) {
+                parts.push({
+                  fileData: {
+                    mimeType: file.mimeType,
+                    fileUri: file.fileUri
+                  }
+                });
+              }
+            }
+
+            const geminiResponse = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:streamGenerateContent?alt=sse&key=${apiKey}`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ contents: [{ parts: parts }] })
+              }
+            );
+
+            if (geminiResponse.ok) {
+              const { readable, writable } = new TransformStream();
+              geminiResponse.body.pipeTo(writable);
+              return new Response(readable, {
+                headers: {
+                  "Content-Type": "text/event-stream",
+                  "Cache-Control": "no-cache",
+                  "Connection": "keep-alive",
+                  ...corsHeaders
+                }
+              });
+            } else if (hasFiles && geminiResponse.status === 429) {
+              return new Response("La cuota de Gemini para procesar archivos/imágenes se ha agotado por hoy.", {
+                status: 429,
+                headers: corsHeaders
+              });
+            }
+          }
+
+          return new Response("Error al conectar con los servicios de IA.", { status: 500, headers: corsHeaders });
 
         } catch (err) {
           return new Response(`Error en el servidor: ${err.message}`, { status: 500, headers: corsHeaders });
