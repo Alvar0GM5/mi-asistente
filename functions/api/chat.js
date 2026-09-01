@@ -12,7 +12,7 @@ export async function onRequestPost(context) {
 
     const apiKey = context.env.GEMINI_API_KEY;
     if (!apiKey) {
-      return new Response(JSON.stringify({ error: "No se encontró GEMINI_API_KEY en Cloudflare" }), {
+      return new Response(JSON.stringify({ error: "Falta la API Key" }), {
         status: 500,
         headers: { "Content-Type": "application/json" }
       });
