@@ -467,14 +467,12 @@
                     }
                 }
 
-                const historyContext = activeChat.messages.slice(-6).map(h => (h.role === 'user' ? 'Usuario' : 'Asistente') + ': ' + h.text).join('\n');
-
                 const response = await fetch("/api/chat", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     signal: currentAbortController.signal,
                     body: JSON.stringify({
-                        message: historyContext,
+                        message: messageText,
                         fileUris: fileUris
                     })
                 });
@@ -519,7 +517,7 @@
 
             } catch (error) {
                 if (error.name !== 'AbortError') {
-                    activeChat.messages.push({ role: 'model', text: 'Error: ' + error.message });
+                    activeChat.messages.push({ role: 'model', text: 'Error en la respuesta' });
                     renderMessages();
                 }
             }
