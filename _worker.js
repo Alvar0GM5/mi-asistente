@@ -13,14 +13,16 @@ export default {
     }
 
     const apiKey = env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return new Response("Error: GEMINI_API_KEY no configurada.", { status: 400, headers: corsHeaders });
-    }
+    const groqKey = env.GROQ_API_KEY;
 
-    // Endpoint 1: Iniciar subida directa de archivos a Gemini
+    // Endpoint 1: Subida de archivos pesados a Gemini
     if (url.pathname === "/api/upload") {
       if (request.method === "POST") {
         try {
+          if (!apiKey) {
+            return new Response("Error: GEMINI_API_KEY no configurada.", { status: 400, headers: corsHeaders });
+          }
+
           const { mimeType, numBytes, displayName } = await request.json();
 
           const initRes = await fetch(
@@ -38,11 +40,12 @@ export default {
             }
           );
 
-          const uploadUrl = initRes.headers.get("X-Goog-Upload-URL");
-          if (!uploadUrl) {
-            return new Response("Error al obtener la URL de subida.", { status: 500, headers: corsHeaders });
+          if (!initRes.ok) {
+            const errBody = await initRes.text();
+            return new Response(`Error al iniciar subida: ${errBody}`, { status: initRes.status, headers: corsHeaders });
           }
 
+          const uploadUrl = initRes.headers.get("X-Goog-Upload-URL");
           return new Response(JSON.stringify({ uploadUrl }), {
             headers: { "Content-Type": "application/json", ...corsHeaders }
           });
@@ -52,7 +55,7 @@ export default {
       }
     }
 
-    // Endpoint 2: Chat con streaming ultra-rápido usando gemini-3.6-flash
+    // Endpoint 2: Chat con fallback automático a Groq API
     if (url.pathname === "/api/chat") {
       if (request.method === "POST") {
         try {
@@ -74,38 +77,70 @@ export default {
             }
           }
 
-          if (parts.length === 0) {
-            return new Response("Error: No se envió contenido.", { status: 400, headers: corsHeaders });
+          // Intentar primero con Gemini
+          if (apiKey) {
+            const geminiResponse = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:streamGenerateContent?alt=sse&key=${apiKey}`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ contents: [{ parts: parts }] })
+              }
+            );
+
+            // Si Gemini responde correctamente, devolvemos su flujo
+            if (geminiResponse.ok) {
+              const { readable, writable } = new TransformStream();
+              geminiResponse.body.pipeTo(writable);
+              return new Response(readable, {
+                headers: {
+                  "Content-Type": "text/event-stream",
+                  "Cache-Control": "no-cache",
+                  "Connection": "keep-alive",
+                  ...corsHeaders
+                }
+              });
+            }
           }
 
-          const geminiResponse = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:streamGenerateContent?alt=sse&key=${apiKey}`,
-            {
+          // Si Gemini falla (p. ej. error 429 por cuota) y tenemos clave de Groq, usamos Groq como respaldo
+          if (groqKey) {
+            const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ contents: [{ parts: parts }] })
-            }
-          );
-
-          if (!geminiResponse.ok) {
-            const errText = await geminiResponse.text();
-            return new Response(`Error de la API de Gemini: ${errText}`, {
-              status: geminiResponse.status,
-              headers: corsHeaders
+              headers: {
+                "Authorization": `Bearer ${groqKey}`,
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({
+                model: "llama-3.3-70b-versatile",
+                messages: [{ role: "user", content: body.message || "Responde al usuario." }]
+              })
             });
+
+            if (groqRes.ok) {
+              const groqData = await groqRes.json();
+              const replyText = groqData.choices?.[0]?.message?.content || "Sin respuesta.";
+
+              // Formateamos la respuesta para que la interfaz la lea sin errores
+              const sseFormatted = `data: ${JSON.stringify({
+                candidates: [{ content: { parts: [{ text: replyText }] } }]
+              })}\n\ndata: [DONE]\n\n`;
+
+              return new Response(sseFormatted, {
+                headers: {
+                  "Content-Type": "text/event-stream",
+                  "Cache-Control": "no-cache",
+                  ...corsHeaders
+                }
+              });
+            }
           }
 
-          const { readable, writable } = new TransformStream();
-          geminiResponse.body.pipeTo(writable);
-
-          return new Response(readable, {
-            headers: {
-              "Content-Type": "text/event-stream",
-              "Cache-Control": "no-cache",
-              "Connection": "keep-alive",
-              ...corsHeaders
-            }
+          return new Response("Ambas API (Gemini y Groq) han alcanzado su límite o fallado.", {
+            status: 429,
+            headers: corsHeaders
           });
+
         } catch (err) {
           return new Response(`Error en el servidor: ${err.message}`, { status: 500, headers: corsHeaders });
         }
