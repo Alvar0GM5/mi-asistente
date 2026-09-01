@@ -49,6 +49,7 @@
             max-width: 80%;
             word-wrap: break-word;
             font-size: 14px;
+            white-space: pre-wrap;
         }
         .user-message {
             background: #3b82f6;
@@ -122,7 +123,7 @@
 
             const chatMessages = document.getElementById("chatMessages");
 
-            // 1. Mostrar el mensaje del usuario
+            // 1. Mostrar mensaje del usuario
             const userDiv = document.createElement("div");
             userDiv.className = "message user-message";
             userDiv.textContent = messageText;
@@ -131,30 +132,46 @@
             inputField.value = "";
             chatMessages.scrollTop = chatMessages.scrollHeight;
 
-            // 2. Crear el elemento visual temporal "Pensando..."
+            // 2. Crear caja de respuesta vacía
             const loadingDiv = document.createElement("div");
             loadingDiv.className = "message ai-message";
-            loadingDiv.textContent = "Pensando...";
+            loadingDiv.textContent = "";
             chatMessages.appendChild(loadingDiv);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
 
             try {
-                // 3. Petición POST al endpoint /api/chat
                 const response = await fetch(WORKER_URL, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ message: messageText })
                 });
 
-                const data = await response.json();
-                
-                // 4. Actualizar el texto del mensaje temporal con la respuesta final de la IA
-                if (data.reply) {
-                    loadingDiv.textContent = data.reply;
-                } else if (data.error) {
-                    loadingDiv.textContent = "Error: " + data.error;
-                } else {
-                    loadingDiv.textContent = "Respuesta vacía del servidor.";
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder("utf-8");
+                let buffer = "";
+
+                // 3. Procesar el flujo de datos conforme llegan los paquetes
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split("\n");
+                    buffer = lines.pop(); // Mantener línea incompleta en el buffer
+
+                    for (const line of lines) {
+                        if (line.startsWith("data: ")) {
+                            const jsonStr = line.replace("data: ", "").trim();
+                            if (jsonStr === "[DONE]") break;
+                            try {
+                                const parsed = JSON.parse(jsonStr);
+                                const textChunk = parsed.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                                loadingDiv.textContent += textChunk;
+                                chatMessages.scrollTop = chatMessages.scrollHeight;
+                            } catch (e) {
+                                // Ignorar bloques mal formateados
+                            }
+                        }
+                    }
                 }
             } catch (error) {
                 loadingDiv.textContent = "Error de conexión con el servidor.";
