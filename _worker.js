@@ -55,19 +55,23 @@ export default {
       }
     }
 
-    // Endpoint 2: Chat con Groq (Llama 3.1) y Gemini
+    // Endpoint 2: Chat
     if (url.pathname === "/api/chat") {
       if (request.method === "POST") {
         try {
           const body = await request.json();
           const hasFiles = body.fileUris && Array.isArray(body.fileUris) && body.fileUris.length > 0;
 
-          // 1. Si es solo texto, enviamos a GROQ con el modelo ultra-rápido Llama 3.1
+          if (!groqKey && !apiKey) {
+            return new Response("Error: No se han encontrado variables de entorno GROQ_API_KEY ni GEMINI_API_KEY en Cloudflare.", { status: 500, headers: corsHeaders });
+          }
+
+          // 1. Si es solo texto, probamos con GROQ
           if (!hasFiles && groqKey) {
             const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
               method: "POST",
               headers: {
-                "Authorization": `Bearer ${groqKey}`,
+                "Authorization": `Bearer ${groqKey.trim()}`,
                 "Content-Type": "application/json"
               },
               body: JSON.stringify({
@@ -91,10 +95,13 @@ export default {
                   ...corsHeaders
                 }
               });
+            } else {
+              const groqErrText = await groqRes.text();
+              return new Response(`Error de Groq (${groqRes.status}): ${groqErrText}`, { status: 500, headers: corsHeaders });
             }
           }
 
-          // 2. Si contiene archivos o Groq falla, se envía a GEMINI
+          // 2. Si contiene archivos o no hay clave de Groq, usamos Gemini
           if (apiKey) {
             const parts = [];
             if (body.message) parts.push({ text: body.message });
@@ -111,7 +118,7 @@ export default {
             }
 
             const geminiResponse = await fetch(
-              `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:streamGenerateContent?alt=sse&key=${apiKey}`,
+              `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:streamGenerateContent?alt=sse&key=${apiKey.trim()}`,
               {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -130,15 +137,13 @@ export default {
                   ...corsHeaders
                 }
               });
-            } else if (hasFiles && geminiResponse.status === 429) {
-              return new Response("La cuota de Gemini para analizar archivos se ha agotado temporalmente.", {
-                status: 429,
-                headers: corsHeaders
-              });
+            } else {
+              const geminiErrText = await geminiResponse.text();
+              return new Response(`Error de Gemini (${geminiResponse.status}): ${geminiErrText}`, { status: 500, headers: corsHeaders });
             }
           }
 
-          return new Response("No se pudo obtener respuesta del servicio de IA.", { status: 500, headers: corsHeaders });
+          return new Response("No hay ninguna clave configurada en el servidor.", { status: 500, headers: corsHeaders });
 
         } catch (err) {
           return new Response(`Error en el servidor: ${err.message}`, { status: 500, headers: corsHeaders });
