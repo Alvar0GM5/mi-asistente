@@ -474,7 +474,12 @@
                     headers: { "Content-Type": "application/json" },
                     signal: currentAbortController.signal,
                     body: JSON.stringify({
-                        message: historyContext,
+                        contents: [
+                            {
+                                role: "user",
+                                parts: [{ text: historyContext }]
+                            }
+                        ],
                         fileUris: fileUris
                     })
                 });
