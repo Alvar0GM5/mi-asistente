@@ -19,7 +19,6 @@ export default {
           const body = await request.json();
           const apiKey = env.GEMINI_API_KEY;
 
-          // 1. Comprueba si existe la API Key en Cloudflare
           if (!apiKey) {
             return new Response(
               JSON.stringify({ reply: "Error: La variable GEMINI_API_KEY no está configurada en los ajustes de Cloudflare." }),
@@ -27,9 +26,9 @@ export default {
             );
           }
 
-          // 2. Llamada a la API de Google Gemini
+          // Llamada usando el modelo activo gemini-1.5-flash
           const geminiResponse = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -39,7 +38,6 @@ export default {
 
           const data = await geminiResponse.json();
 
-          // 3. Captura el mensaje de error que devuelve Google (si falla la clave o el modelo)
           if (data.error) {
             return new Response(
               JSON.stringify({ reply: `Error de Google Gemini: ${data.error.message}` }),
@@ -47,7 +45,6 @@ export default {
             );
           }
 
-          // 4. Obtiene el texto generado o muestra aviso si vino vacío
           const aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Google no devolvió ningún texto en la respuesta.";
 
           return new Response(JSON.stringify({ reply: aiReply }), {
