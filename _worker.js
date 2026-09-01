@@ -52,8 +52,8 @@ export default {
 
         // --- CASO B: SOLO TEXTO -> GROK (xAI) ---
         else {
-          // Obtiene la clave de las variables secretas de Cloudflare de forma segura
-          const grokApiKey = env.GROK_API_KEY || env.XAI_API_KEY; 
+          // Lee de forma segura la variable desde Cloudflare
+          const grokApiKey = env.GROK_API_KEY; 
 
           if (!grokApiKey) {
             return new Response(JSON.stringify({ error: "Falta la variable GROK_API_KEY en el panel de Cloudflare" }), { 
